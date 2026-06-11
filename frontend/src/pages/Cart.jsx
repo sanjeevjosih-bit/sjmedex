@@ -14,13 +14,15 @@ export default function Cart() {
   useEffect(() => { localStorage.setItem('sjmedex_cart', JSON.stringify(cart)); }, [cart]);
 
   const cartItems = Object.entries(cart).map(([id,qty])=>({...products.find(p=>p.id==id),qty})).filter(p=>p.id);
-  const subtotal = cartItems.reduce((s,p)=>s+p.price*p.qty,0);
-  const delivery = subtotal>=5000?0:199;
-  const total = subtotal+delivery;
+  const total = cartItems.reduce((s,p)=>s+parseFloat(p.price)*p.qty,0);
   const cartCount = Object.values(cart).reduce((a,b)=>a+b,0);
 
-  function changeQty(id, d) {
-    setCart(c => { const n={...c}; n[id]=(n[id]||0)+d; if(n[id]<=0) delete n[id]; return n; });
+  function changeQty(id, d, minOrder) {
+    setCart(c => {
+      const next = (c[id]||minOrder) + d;
+      if(next < minOrder) return c;
+      return {...c, [id]: next};
+    });
   }
 
   async function placeOrder() {
@@ -28,7 +30,7 @@ export default function Cart() {
     setLoading(true); setError('');
     try {
       const items = cartItems.map(p=>({product_id:p.id, qty:p.qty}));
-      const res = await api.post('/orders', {items});
+      await api.post('/orders', {items});
       localStorage.removeItem('sjmedex_cart');
       setCart({});
       navigate('/orders');
@@ -43,45 +45,66 @@ export default function Cart() {
         <div className="page-title">My Cart</div>
         <div className="page-sub">{cartItems.length} items</div>
         {error && <div className="error-msg">{error}</div>}
+
         {cartItems.length===0 ? (
           <div style={{textAlign:'center',padding:60,color:'#9ca3af'}}>
-            <div style={{fontSize:40,marginBottom:12}}>🛒</div>
-            <div>Your cart is empty</div>
-            <button onClick={()=>navigate('/products')} style={{marginTop:14,padding:'8px 20px',background:'#0F6E56',color:'#fff',border:'none',borderRadius:8,cursor:'pointer'}}>Browse Products</button>
+            <div style={{fontSize:48,marginBottom:12}}>🛒</div>
+            <div style={{fontSize:15,marginBottom:16}}>Your cart is empty</div>
+            <button onClick={()=>navigate('/products')} style={{padding:'10px 24px',background:'#0F6E56',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>Browse Products</button>
           </div>
         ) : (
-          <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:20}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 300px',gap:20}}>
             <div>
-              {cartItems.map(p=>(
-                <div key={p.id} style={{background:'#fff',border:'1px solid #e5e7eb',borderRadius:10,padding:16,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:500}}>{p.name}</div>
-                    <div style={{fontSize:12,color:'#6b7280',marginTop:2}}>{p.manufacturer} · ₹{p.price}/{p.unit}</div>
-                    <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
-                      <button onClick={()=>changeQty(p.id,-1)} style={{width:26,height:26,border:'1px solid #e5e7eb',borderRadius:5,background:'#f9fafb',cursor:'pointer',fontSize:14}}>−</button>
-                      <span style={{fontWeight:500,minWidth:20,textAlign:'center'}}>{p.qty}</span>
-                      <button onClick={()=>changeQty(p.id,1)} style={{width:26,height:26,border:'1px solid #e5e7eb',borderRadius:5,background:'#f9fafb',cursor:'pointer',fontSize:14}}>+</button>
+              {cartItems.map(p=>{
+                const minOrder = parseInt(p.min_order)||1000;
+                return (
+                  <div key={p.id} style={{background:'#fff',border:'1px solid #e5e7eb',borderRadius:12,padding:16,marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                      <div>
+                        <div style={{fontWeight:600,fontSize:14}}>{p.name}</div>
+                        <div style={{fontSize:12,color:'#6b7280',marginTop:2}}>{p.manufacturer}</div>
+                        <div style={{fontSize:12,color:'#6b7280',marginTop:2}}>₹{p.price}/{p.unit} · Min {minOrder} units</div>
+                      </div>
+                      <button onClick={()=>{const n={...cart};delete n[p.id];setCart(n);}} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:18}}>×</button>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:12,background:'#f9fafb',borderRadius:8,padding:'6px 12px',border:'1px solid #e5e7eb'}}>
+                        <button onClick={()=>changeQty(p.id,-minOrder,minOrder)} style={{width:30,height:30,border:'1px solid #e5e7eb',borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16,fontWeight:700,color:'#0F6E56'}}>−</button>
+                        <div style={{textAlign:'center',minWidth:60}}>
+                          <div style={{fontWeight:700,fontSize:16}}>{p.qty}</div>
+                          <div style={{fontSize:10,color:'#9ca3af'}}>units</div>
+                        </div>
+                        <button onClick={()=>changeQty(p.id,minOrder,minOrder)} style={{width:30,height:30,border:'1px solid #e5e7eb',borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16,fontWeight:700,color:'#0F6E56'}}>+</button>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:12,color:'#9ca3af'}}>Item total</div>
+                        <div style={{fontWeight:700,fontSize:18,color:'#0F6E56'}}>₹{(parseFloat(p.price)*p.qty).toLocaleString('en-IN')}</div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontWeight:600,color:'#0F6E56',fontSize:16}}>₹{(p.price*p.qty).toLocaleString('en-IN')}</div>
-                    <button onClick={()=>changeQty(p.id,-999)} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:12,marginTop:6}}>Remove</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <div style={{background:'#fff',border:'1px solid #e5e7eb',borderRadius:10,padding:20,alignSelf:'start',position:'sticky',top:70}}>
-              <div style={{fontWeight:600,fontSize:15,marginBottom:14}}>Order summary</div>
-              <div style={{background:'#E1F5EE',borderRadius:8,padding:14}}>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'#6b7280',marginBottom:6}}><span>Subtotal</span><span>₹{subtotal.toLocaleString('en-IN')}</span></div>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'#6b7280',marginBottom:6}}><span>Delivery</span><span>{delivery===0?'FREE':'₹'+delivery}</span></div>
-                {delivery>0&&<div style={{fontSize:11,color:'#0F6E56',marginBottom:6}}>Add ₹{(5000-subtotal).toLocaleString('en-IN')} for free delivery</div>}
-                <div style={{display:'flex',justifyContent:'space-between',fontWeight:600,fontSize:16,color:'#085041',paddingTop:8,borderTop:'1px solid #9FE1CB'}}><span>Total</span><span>₹{total.toLocaleString('en-IN')}</span></div>
+
+            <div style={{background:'#fff',border:'1px solid #e5e7eb',borderRadius:12,padding:20,alignSelf:'start',position:'sticky',top:70}}>
+              <div style={{fontWeight:600,fontSize:15,marginBottom:16}}>Order Summary</div>
+              <div style={{background:'#f0fdf4',borderRadius:8,padding:14,marginBottom:16}}>
+                {cartItems.map(p=>(
+                  <div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#6b7280',marginBottom:6}}>
+                    <span>{p.name} ×{p.qty}</span>
+                    <span>₹{(parseFloat(p.price)*p.qty).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+                <div style={{borderTop:'1px solid #bbf7d0',paddingTop:10,marginTop:8,display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:16,color:'#0F6E56'}}>
+                  <span>Total</span>
+                  <span>₹{total.toLocaleString('en-IN')}</span>
+                </div>
+                <div style={{textAlign:'center',marginTop:8,fontSize:11,color:'#15803d',fontWeight:500}}>🚚 FREE Delivery on all orders</div>
               </div>
-              <button onClick={placeOrder} disabled={loading} style={{width:'100%',padding:12,background:'#0F6E56',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:500,cursor:'pointer',marginTop:14}}>
-                {loading?'Placing order...':'Place Order'}
+              <button onClick={placeOrder} disabled={loading} style={{width:'100%',padding:13,background:'#0F6E56',color:'#fff',border:'none',borderRadius:8,fontSize:15,fontWeight:600,cursor:'pointer'}}>
+                {loading?'Placing order...':'Place Order ✓'}
               </button>
-              <p style={{fontSize:11,color:'#9ca3af',textAlign:'center',marginTop:8}}>Payment on delivery accepted</p>
+              <p style={{fontSize:11,color:'#9ca3af',textAlign:'center',marginTop:10}}>Payment on delivery · No hidden charges</p>
             </div>
           </div>
         )}
