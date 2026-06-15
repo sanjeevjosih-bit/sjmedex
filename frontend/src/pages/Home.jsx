@@ -246,7 +246,7 @@ export default function Home() {
             {[
               {icon:'🏛️',label:'GST Registered',value:'06CTDPS6578R1ZJ',sub:'Haryana Active',color:'#e5f5ef',border:'#86efac'},
               {icon:'🧾',label:'FSSAI Licensed',value:'20826004000806',sub:'Food Safety Valid',color:'#eff6ff',border:'#93c5fd'},
-              {icon:'💊',label:'Drug License',value:'WLF20B2025HR001699',sub:'Retail and Wholesale',color:'#fefce8',border:'#fde047'},
+              {icon:'💊',label:'Drug License',value:'WLF20B2025HR001699',sub:'Wholesale Only',color:'#fefce8',border:'#fde047'},
               {icon:'📋',label:'PAN Verified',value:'CTDPS6578R',sub:'Income Tax Dept',color:'#fdf4ff',border:'#d8b4fe'},
             ].map(c=>(
               <div key={c.label} style={{background:c.color,border:'1px solid '+c.border,borderRadius:14,padding:18,position:'relative'}}>
@@ -283,9 +283,9 @@ export default function Home() {
           </div>
           <div className="testi-g" style={{display:'grid',gap:16}}>
             {[
-              {name:'Rakesh Sharma',role:'Sharma Medical Store, Faridabad',text:'Been ordering for 2 years. Prices are genuinely 25-30% lower than local suppliers. GST invoices make accounting so much easier.'},
-              {name:'Dr. Priya Nair',role:'Nair Clinic, Ballabhagarh',text:'The verification process gave me confidence. Surgical supplies quality is excellent and delivery is always on time. Highly recommended.'},
-              {name:'Amit Sinha',role:'HealthPlus Pharmacy, NIT Faridabad',text:'Saving Rs.18,000 every month since joining. The platform works perfectly and ordering takes less than 2 minutes.'},
+              {name:'Luv Medical Store',role:'Faridabad, Haryana',text:'Been ordering for 2 years. Prices are genuinely 25-30% lower than local suppliers. GST invoices make accounting so much easier.'},
+              {name:'Gaurav Medical Store',role:'Ballabhagarh, Haryana',text:'The verification process gave me confidence. Surgical supplies quality is excellent and delivery is always on time. Highly recommended.'},
+              {name:'Goyal Medical Store',role:'NIT Faridabad, Haryana',text:'Saving Rs.18,000 every month since joining. The platform works perfectly and ordering takes less than 2 minutes.'},
             ].map(t=>(
               <div key={t.name} style={{background:'#fff',borderRadius:16,padding:22,border:'1px solid #d1fae5',boxShadow:'0 2px 12px rgba(0,0,0,0.04)'}}>
                 <div style={{display:'flex',gap:2,marginBottom:12}}>
@@ -293,7 +293,7 @@ export default function Home() {
                 </div>
                 <div style={{fontSize:13,color:'#374151',lineHeight:1.7,marginBottom:16,fontStyle:'italic'}}>"{t.text}"</div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
-                  <div style={{width:36,height:36,background:'#e5f5ef',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'#0a5c47',fontSize:14}}>{t.name[0]}</div>
+                  <div style={{width:36,height:36,background:'#e5f5ef',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'#0a5c47',fontSize:14}}>🏥</div>
                   <div>
                     <div style={{fontWeight:700,fontSize:13,color:'#0a3d2e'}}>{t.name}</div>
                     <div style={{fontSize:11,color:'#6b7280'}}>{t.role}</div>
