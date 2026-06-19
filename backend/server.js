@@ -339,9 +339,13 @@ app.delete('/api/admin/products/:id', adminMiddleware, async (req, res) => {
 app.post('/api/admin/sync-swipe', adminMiddleware, async (req, res) => {
   try {
     const result = await syncSwipeProductsToDatabase(pool);
+    let message = `Synced ${result.total} products: ${result.created} created, ${result.updated} updated, ${result.errors} errors`;
+    if (result.firstErrorDetail) {
+      message += ` | First error: ${result.firstErrorDetail.error} (product: ${result.firstErrorDetail.name})`;
+    }
     res.json({
       success: true,
-      message: `Synced ${result.total} products: ${result.created} created, ${result.updated} updated, ${result.errors} errors`,
+      message,
       ...result
     });
   } catch (err) {
