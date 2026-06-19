@@ -11,6 +11,8 @@ export default function AdminApp() {
   const [analytics, setAnalytics] = useState(null);
   const [newProd, setNewProd] = useState({name:'',manufacturer:'',category:'medicine',price:'',mrp:'',unit:'',min_order:1000,expiry_date:''});
   const [showAddProd, setShowAddProd] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -48,6 +50,21 @@ export default function AdminApp() {
     if(!confirm('Delete this product?')) return;
     await api.delete(`/admin/products/${id}`);
     setProducts(ps=>ps.filter(p=>p.id!==id));
+  }
+
+  async function syncWithSwipe() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await api.post('/admin/sync-swipe');
+      setSyncResult(res.data);
+      const productsRes = await api.get('/admin/products');
+      setProducts(productsRes.data);
+    } catch (err) {
+      setSyncResult({ success: false, error: err.response?.data?.error || 'Sync failed. Check SWIPE_API_KEY is set correctly on Render.' });
+    } finally {
+      setSyncing(false);
+    }
   }
 
   const statusClass = {pending:'badge-pending',processing:'badge-processing',shipped:'badge-processing',delivered:'badge-approved',cancelled:'badge-rejected',approved:'badge-approved',rejected:'badge-rejected'};
@@ -123,6 +140,22 @@ export default function AdminApp() {
             </div>
             <div className="page-sub">{products.length} products in catalogue</div>
 
+            {/* SWIPE SYNC CARD */}
+            <div style={{background:'#f0fdf9',border:'1.5px solid #1DB97A',borderRadius:12,padding:16,marginBottom:20,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:14,color:'#0a5c47',marginBottom:3}}>🔄 Swipe Inventory Sync</div>
+                <div style={{fontSize:12,color:'#6b7280'}}>Pull latest products, prices and stock directly from your Swipe account</div>
+              </div>
+              <button onClick={syncWithSwipe} disabled={syncing} style={{background:syncing?'#9ca3af':'#0a5c47',color:'#fff',border:'none',padding:'10px 20px',borderRadius:8,fontSize:13,fontWeight:700,cursor:syncing?'default':'pointer',whiteSpace:'nowrap'}}>
+                {syncing ? '⏳ Syncing...' : '🔄 Sync Now'}
+              </button>
+            </div>
+            {syncResult && (
+              <div style={{background:syncResult.success?'#dcfce7':'#fee2e2',color:syncResult.success?'#15803d':'#dc2626',padding:'12px 16px',borderRadius:8,fontSize:13,marginBottom:16,fontWeight:600}}>
+                {syncResult.success ? `✅ ${syncResult.message}` : `❌ ${syncResult.error}`}
+              </div>
+            )}
+
             {showAddProd&&(
               <div style={{background:'#fff',border:'1px solid #e5e7eb',borderRadius:12,padding:20,marginBottom:20}}>
                 <div style={{fontWeight:600,fontSize:15,marginBottom:16}}>Add New Product</div>
@@ -157,7 +190,8 @@ export default function AdminApp() {
                     {p.mrp&&<div><div style={{fontSize:10,color:'#9ca3af'}}>MRP</div><div style={{fontWeight:500,color:'#6b7280',fontSize:14,textDecoration:'line-through'}}>₹{p.mrp}</div></div>}
                   </div>
                   <div style={{fontSize:11,color:'#6b7280',marginBottom:4}}>📦 Min: {p.min_order} · {p.unit}</div>
-                  {p.expiry_date&&<div style={{fontSize:11,color:'#6b7280',marginBottom:10}}>📅 Exp: {new Date(p.expiry_date).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</div>}
+                  {p.expiry_date&&<div style={{fontSize:11,color:'#6b7280',marginBottom:6}}>📅 Exp: {new Date(p.expiry_date).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</div>}
+                  {p.swipe_id&&<div style={{fontSize:10,color:'#1DB97A',marginBottom:10,fontWeight:600}}>🔄 Synced from Swipe</div>}
                   <div style={{display:'flex',gap:6,marginTop:8}}>
                     <button onClick={()=>toggleStock(p.id,p.in_stock)} style={{flex:1,padding:'6px',fontSize:11,cursor:'pointer',border:'1px solid #e5e7eb',borderRadius:6,background:'#f9fafb',color:'#374151',fontWeight:500}}>Toggle Stock</button>
                     <button onClick={()=>deleteProduct(p.id)} style={{padding:'6px 10px',fontSize:11,cursor:'pointer',border:'1px solid #fca5a5',borderRadius:6,background:'#fee2e2',color:'#dc2626'}}>🗑</button>
