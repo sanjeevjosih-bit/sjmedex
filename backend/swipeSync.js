@@ -52,24 +52,27 @@ async function syncSwipeProductsToDatabase(pool) {
 
   let created = 0, updated = 0, errors = 0;
   const log = [];
+  let firstErrorDetail = null;
 
   for (const item of swipeItems) {
     try {
-      const swipeId = item.id || item.swipe_id;
-      const name = item.name;
-      const price = parseFloat(item.price_with_tax || item.unit_price || 0);
-      const qty = parseFloat(item.quantity || 0);
+      const swipeId = String(item.id || item.swipe_id || '');
+      const name = item.name || 'Unnamed Product';
+      const price = parseFloat(item.price_with_tax || item.unit_price || item.price || 0) || 0;
+      const qty = parseFloat(item.quantity || item.stock_quantity || 0) || 0;
       const hsnCode = item.hsn_code || '3005';
-      const gstRate = parseFloat(item.tax_rate || 5);
+      const gstRate = parseFloat(item.tax_rate || item.gst_rate || 5) || 5;
       const unit = item.unit || 'pc';
       const category = mapCategory(item.category, name);
       const inStock = qty > 0;
 
-      // Check if product already exists by swipe_id
+      if (!swipeId) {
+        throw new Error('Missing swipe item id for: ' + name);
+      }
+
       const existing = await pool.query('SELECT id FROM products WHERE swipe_id = $1', [swipeId]);
 
       if (existing.rows.length > 0) {
-        // Update existing product
         await pool.query(
           `UPDATE products 
            SET name = $1, price = $2, hsn_code = $3, gst_rate = $4, 
@@ -80,7 +83,6 @@ async function syncSwipeProductsToDatabase(pool) {
         );
         updated++;
       } else {
-        // Create new product
         await pool.query(
           `INSERT INTO products (name, manufacturer, category, price, unit, min_order, in_stock, description, swipe_id, hsn_code, gst_rate, stock_qty, last_synced_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
@@ -91,11 +93,20 @@ async function syncSwipeProductsToDatabase(pool) {
       log.push({ name, swipeId, status: existing.rows.length > 0 ? 'updated' : 'created' });
     } catch (err) {
       errors++;
-      log.push({ name: item.name, error: err.message });
+      const errDetail = { name: item.name, swipeId: item.id, error: err.message };
+      log.push(errDetail);
+      if (!firstErrorDetail) firstErrorDetail = errDetail;
+      console.error('Swipe sync item error:', JSON.stringify(errDetail));
+      console.error('Raw item data:', JSON.stringify(item));
     }
   }
 
-  return { total: swipeItems.length, created, updated, errors, log };
+  console.log(`Swipe sync finished. Total: ${swipeItems.length}, Created: ${created}, Updated: ${updated}, Errors: ${errors}`);
+  if (firstErrorDetail) {
+    console.error('First error detail:', JSON.stringify(firstErrorDetail));
+  }
+
+  return { total: swipeItems.length, created, updated, errors, log, firstErrorDetail };
 }
 
 module.exports = { syncSwipeProductsToDatabase, fetchSwipeProducts };
