@@ -354,6 +354,20 @@ app.post('/api/admin/sync-swipe', adminMiddleware, async (req, res) => {
   }
 });
 
+// TEMPORARY DEBUG ROUTE — shows raw Swipe data for first 3 products
+app.get('/api/admin/debug-swipe-raw', adminMiddleware, async (req, res) => {
+  try {
+    const axios = require('axios');
+    const response = await axios.get('https://app.getswipe.in/api/partner/v2/product/list', {
+      headers: { Authorization: `Bearer ${process.env.SWIPE_API_KEY}` },
+      params: { page: 1, num_records: 3 },
+    });
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: err.message, details: err.response?.data });
+  }
+});
+
 // Admin analytics
 app.get('/api/admin/analytics', adminMiddleware, async (req, res) => {
   try {
