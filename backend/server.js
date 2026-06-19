@@ -8,6 +8,7 @@ const pool = require('./db');
 const { sendOTP, verifyOTP } = require('./otpService');
 const { uploadDrugLicense } = require('./uploadService');
 const { authMiddleware, adminMiddleware } = require('./middleware');
+const { syncSwipeProductsToDatabase } = require('./swipeSync');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -334,6 +335,21 @@ app.delete('/api/admin/products/:id', adminMiddleware, async (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
+// Admin: trigger Swipe inventory sync manually
+app.post('/api/admin/sync-swipe', adminMiddleware, async (req, res) => {
+  try {
+    const result = await syncSwipeProductsToDatabase(pool);
+    res.json({
+      success: true,
+      message: `Synced ${result.total} products: ${result.created} created, ${result.updated} updated, ${result.errors} errors`,
+      ...result
+    });
+  } catch (err) {
+    console.error('Swipe sync error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Admin analytics
 app.get('/api/admin/analytics', adminMiddleware, async (req, res) => {
   try {
@@ -368,3 +384,15 @@ if (process.env.NODE_ENV === 'production') {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`SJ Medex server running on port ${PORT}`));
+
+// ─── Automatic Swipe sync every 6 hours ──────────────────────────────────────
+setInterval(async () => {
+  if (!process.env.SWIPE_API_KEY) return;
+  try {
+    console.log('Running scheduled Swipe sync...');
+    const result = await syncSwipeProductsToDatabase(pool);
+    console.log(`Swipe sync complete: ${result.created} created, ${result.updated} updated, ${result.errors} errors`);
+  } catch (err) {
+    console.error('Scheduled Swipe sync failed:', err.message);
+  }
+}, 6 * 60 * 60 * 1000); // every 6 hours
