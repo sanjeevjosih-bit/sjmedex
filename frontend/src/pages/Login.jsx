@@ -1,45 +1,60 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 
+const GOOGLE_CLIENT_ID = '1007931042684-65eqpp3bi2ussf9e4c1d9u9ts2n0ho7u.apps.googleusercontent.com';
+
 export default function Login() {
-  const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState('mobile'); // mobile | otp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [devOtp, setDevOtp] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const buttonRef = useRef(null);
 
-  async function handleSendOTP() {
-    if (mobile.length !== 10) return setError('Enter a valid 10-digit mobile number');
+  useEffect(() => {
+    function initGoogle() {
+      if (!window.google || !buttonRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleResponse,
+      });
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: 320,
+        text: 'continue_with',
+      });
+    }
+
+    if (window.google) {
+      initGoogle();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = initGoogle;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  async function handleGoogleResponse(response) {
     setLoading(true); setError('');
     try {
-      const res = await api.post('/auth/send-otp', { mobile });
-      if (res.data.dev_otp) setDevOtp(res.data.dev_otp); // dev mode hint
-      setStep('otp');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send OTP');
-    } finally { setLoading(false); }
-  }
-
-  async function handleVerifyOTP() {
-    if (otp.length !== 4) return setError('Enter the 4-digit OTP');
-    setLoading(true); setError('');
-    try {
-      const res = await api.post('/auth/verify-otp', { mobile, otp });
+      const res = await api.post('/auth/google', { id_token: response.credential });
       if (res.data.status === 'new_user') {
-        navigate('/register', { state: { mobile, verified: true } });
+        navigate('/register', { state: { email: res.data.email, name: res.data.name, google_id: res.data.google_id } });
         return;
       }
       login(res.data.token, res.data.pharmacy);
       if (res.data.pharmacy.status === 'approved') navigate('/dashboard');
       else navigate('/pending');
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid OTP');
-    } finally { setLoading(false); }
+      setError(err.response?.data?.error || 'Google sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -49,56 +64,24 @@ export default function Login() {
         <span style={{ fontWeight: 700, fontSize: 18, color: '#0F6E56' }}>SJ Medex</span>
       </Link>
 
-      <div className="card" style={{ width: '100%', maxWidth: 400 }}>
+      <div className="card" style={{ width: '100%', maxWidth: 400, textAlign: 'center' }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Welcome back</h2>
-        <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 24 }}>
-          {step === 'mobile' ? 'Enter your registered mobile number' : `OTP sent to +91 ${mobile}`}
+        <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 28 }}>
+          Sign in with Google to access your account
         </p>
 
-        {error && <div className="error-msg">{error}</div>}
+        {error && <div className="error-msg" style={{ marginBottom: 16, textAlign: 'left' }}>{error}</div>}
 
-        {step === 'mobile' ? (
-          <>
-            <div className="form-group">
-              <label className="form-label">Mobile number</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, color: '#6b7280', whiteSpace: 'nowrap' }}>+91</div>
-                <input className="form-input" type="tel" maxLength={10} placeholder="9XXXXXXXXX" value={mobile}
-                  onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}
-                  onKeyDown={e => e.key === 'Enter' && handleSendOTP()} />
-              </div>
-            </div>
-            <button className="btn btn-primary" onClick={handleSendOTP} disabled={loading}>
-              {loading ? <><div className="spinner" /> Sending...</> : 'Send OTP'}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="form-group">
-              <label className="form-label">Enter OTP</label>
-              <input className="form-input" type="number" maxLength={4} placeholder="4-digit OTP"
-                value={otp} onChange={e => setOtp(e.target.value.slice(0, 4))}
-                onKeyDown={e => e.key === 'Enter' && handleVerifyOTP()}
-                style={{ fontSize: 20, letterSpacing: 8, textAlign: 'center' }} autoFocus />
-            </div>
-            {devOtp && (
-              <div style={{ background: '#E1F5EE', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#085041', marginBottom: 14 }}>
-                <strong>Dev mode — OTP:</strong> {devOtp}
-              </div>
-            )}
-            <button className="btn btn-primary" onClick={handleVerifyOTP} disabled={loading}>
-              {loading ? <><div className="spinner" /> Verifying...</> : 'Verify & Login'}
-            </button>
-            <div className="divider">or</div>
-            <button style={{ background: 'none', border: 'none', color: '#0F6E56', cursor: 'pointer', fontSize: 13, width: '100%' }}
-              onClick={() => { setStep('mobile'); setOtp(''); setError(''); }}>
-              ← Change number
-            </button>
-          </>
+        {loading && (
+          <div style={{ marginBottom: 16, color: '#6b7280', fontSize: 13 }}>
+            <div className="spinner" style={{ display: 'inline-block', marginRight: 8 }} /> Signing you in...
+          </div>
         )}
 
-        <p style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginTop: 20 }}>
-          New pharmacy? <Link to="/register">Register here</Link>
+        <div ref={buttonRef} style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}></div>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginTop: 24 }}>
+          New pharmacy or clinic? Just sign in with Google above — <br />we'll guide you through a quick registration.
         </p>
       </div>
     </div>
