@@ -22,12 +22,13 @@ export default function Register() {
 
   // If someone lands here without Google info (e.g. typed URL directly), send them to login first
   if (!googleInfo.email) {
+    const typeParam = params.get('type') ? `?type=${params.get('type')}` : '';
     return (
       <div style={{ minHeight: '100vh', background: '#f9fafb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 16 }}>🔒</div>
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Please sign in first</div>
         <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 20 }}>Use Google Sign-In to start your registration.</p>
-        <Link to="/login" style={{ background: '#0a5c47', color: '#fff', padding: '12px 24px', borderRadius: 8, fontWeight: 700, textDecoration: 'none' }}>Go to Login →</Link>
+        <Link to={`/login${typeParam}`} style={{ background: '#0a5c47', color: '#fff', padding: '12px 24px', borderRadius: 8, fontWeight: 700, textDecoration: 'none' }}>Go to Login →</Link>
       </div>
     );
   }
