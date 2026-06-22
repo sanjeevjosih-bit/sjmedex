@@ -112,10 +112,10 @@ export default function Home() {
               Haryana's trusted B2B medical distributor. Order medicines, surgical items and injectables at wholesale rates with proper GST invoices.
             </p>
             <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
-              <Link to="/register?type=pharmacy" style={{background:'#0a5c47',color:'#fff',padding:'12px 22px',borderRadius:9,fontSize:14,fontWeight:700,boxShadow:'0 4px 14px rgba(10,92,71,0.25)',display:'flex',alignItems:'center',gap:6}}>
+              <Link to="/login?type=pharmacy" style={{background:'#0a5c47',color:'#fff',padding:'12px 22px',borderRadius:9,fontSize:14,fontWeight:700,boxShadow:'0 4px 14px rgba(10,92,71,0.25)',display:'flex',alignItems:'center',gap:6}}>
                 🏥 Register as Pharmacy
               </Link>
-              <Link to="/register?type=doctor" style={{background:'#fff',color:'#0a5c47',padding:'12px 22px',borderRadius:9,fontSize:14,fontWeight:600,border:'1.5px solid #0a5c47',display:'flex',alignItems:'center',gap:6}}>
+              <Link to="/login?type=doctor" style={{background:'#fff',color:'#0a5c47',padding:'12px 22px',borderRadius:9,fontSize:14,fontWeight:600,border:'1.5px solid #0a5c47',display:'flex',alignItems:'center',gap:6}}>
                 👨‍⚕️ Register as Doctor
               </Link>
             </div>
@@ -284,10 +284,10 @@ export default function Home() {
             📍 Rajeev Colony, Ballabhagarh, Faridabad — 121004
           </p>
           <div className="cta-btns" style={{display:'flex',gap:10,justifyContent:'center',marginBottom:16}}>
-            <Link to="/register?type=pharmacy" style={{background:'#fff',color:'#0a5c47',padding:'13px 24px',borderRadius:9,fontSize:14,fontWeight:700}}>
+            <Link to="/login?type=pharmacy" style={{background:'#fff',color:'#0a5c47',padding:'13px 24px',borderRadius:9,fontSize:14,fontWeight:700}}>
               🏥 Register as Pharmacy
             </Link>
-            <Link to="/register?type=doctor" style={{background:'rgba(255,255,255,0.12)',color:'#fff',padding:'13px 24px',borderRadius:9,fontSize:14,fontWeight:600,border:'1.5px solid rgba(255,255,255,0.25)'}}>
+            <Link to="/login?type=doctor" style={{background:'rgba(255,255,255,0.12)',color:'#fff',padding:'13px 24px',borderRadius:9,fontSize:14,fontWeight:600,border:'1.5px solid rgba(255,255,255,0.25)'}}>
               👨‍⚕️ Register as Doctor
             </Link>
           </div>
