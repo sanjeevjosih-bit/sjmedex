@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,7 +10,10 @@ export default function Login() {
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const buttonRef = useRef(null);
+  const params = new URLSearchParams(location.search);
+  const regType = params.get('type'); // pharmacy or doctor, if user clicked Register on homepage
 
   useEffect(() => {
     function initGoogle() {
@@ -44,7 +47,8 @@ export default function Login() {
     try {
       const res = await api.post('/auth/google', { id_token: response.credential });
       if (res.data.status === 'new_user') {
-        navigate('/register', { state: { email: res.data.email, name: res.data.name, google_id: res.data.google_id } });
+        const typeParam = regType ? `?type=${regType}` : '';
+        navigate(`/register${typeParam}`, { state: { email: res.data.email, name: res.data.name, google_id: res.data.google_id } });
         return;
       }
       login(res.data.token, res.data.pharmacy);
@@ -65,9 +69,9 @@ export default function Login() {
       </Link>
 
       <div className="card" style={{ width: '100%', maxWidth: 400, textAlign: 'center' }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Welcome back</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{regType ? 'Get started with SJ Medex' : 'Welcome back'}</h2>
         <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 28 }}>
-          Sign in with Google to access your account
+          {regType ? 'Sign in with Google to begin your registration' : 'Sign in with Google to access your account'}
         </p>
 
         {error && <div className="error-msg" style={{ marginBottom: 16, textAlign: 'left' }}>{error}</div>}
