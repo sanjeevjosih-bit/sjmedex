@@ -5,7 +5,7 @@ const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const pool = require('./db');
-const { sendOTP, verifyOTP } = require('./otpService');
+const { verifyGoogleToken } = require('./googleAuthService');
 const { uploadDrugLicense } = require('./uploadService');
 const { authMiddleware, adminMiddleware } = require('./middleware');
 const { syncSwipeProductsToDatabase } = require('./swipeSync');
@@ -22,40 +22,28 @@ function generateOrderNumber() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUTH ROUTES
+// AUTH ROUTES — Google Sign-In
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Send OTP (login or register)
-app.post('/api/auth/send-otp', async (req, res) => {
-  const { mobile } = req.body;
-  if (!mobile || mobile.length !== 10) return res.status(400).json({ error: 'Invalid mobile number' });
+// Google login — verifies Google ID token, logs in existing pharmacy or signals new user
+app.post('/api/auth/google', async (req, res) => {
+  const { id_token } = req.body;
+  if (!id_token) return res.status(400).json({ error: 'Google ID token required' });
 
   try {
-    const otp = await sendOTP(mobile);
-    const response = { message: 'OTP sent successfully' };
-    // In dev mode (no MSG91 keys), return OTP in response for testing
-    if (!process.env.MSG91_AUTH_KEY) response.dev_otp = otp;
-    res.json(response);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to send OTP' });
-  }
-});
+    const googleUser = await verifyGoogleToken(id_token);
 
-// Verify OTP → Login
-app.post('/api/auth/verify-otp', async (req, res) => {
-  const { mobile, otp } = req.body;
-  if (!mobile || !otp) return res.status(400).json({ error: 'Mobile and OTP required' });
+    // Check if pharmacy exists by email
+    const result = await pool.query('SELECT * FROM pharmacies WHERE email = $1', [googleUser.email]);
 
-  try {
-    const valid = await verifyOTP(mobile, otp);
-    if (!valid) return res.status(400).json({ error: 'Invalid or expired OTP' });
-
-    // Check if pharmacy exists
-    const result = await pool.query('SELECT * FROM pharmacies WHERE mobile = $1', [mobile]);
     if (result.rows.length === 0) {
-      // New user — return signal to redirect to registration
-      return res.json({ status: 'new_user', mobile });
+      // New user — signal frontend to redirect to registration, carrying Google info
+      return res.json({
+        status: 'new_user',
+        email: googleUser.email,
+        name: googleUser.name,
+        google_id: googleUser.google_id,
+      });
     }
 
     const pharmacy = result.rows[0];
@@ -63,16 +51,31 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       return res.status(403).json({ error: 'Your application was rejected. Please contact support.' });
     }
 
+    // Backfill google_id if missing (e.g. account created before Google auth was added)
+    if (!pharmacy.google_id) {
+      await pool.query('UPDATE pharmacies SET google_id = $1 WHERE id = $2', [googleUser.google_id, pharmacy.id]);
+    }
+
     const token = jwt.sign(
-      { id: pharmacy.id, mobile: pharmacy.mobile, status: pharmacy.status, role: 'pharmacy' },
+      { id: pharmacy.id, email: pharmacy.email, status: pharmacy.status, role: 'pharmacy' },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    res.json({ token, pharmacy: { id: pharmacy.id, pharmacy_name: pharmacy.pharmacy_name, owner_name: pharmacy.owner_name, mobile: pharmacy.mobile, status: pharmacy.status } });
+    res.json({
+      token,
+      pharmacy: {
+        id: pharmacy.id,
+        pharmacy_name: pharmacy.pharmacy_name,
+        owner_name: pharmacy.owner_name,
+        mobile: pharmacy.mobile,
+        email: pharmacy.email,
+        status: pharmacy.status,
+      }
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Google auth error:', err);
+    res.status(401).json({ error: 'Invalid Google token' });
   }
 });
 
@@ -80,18 +83,18 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 // PHARMACY REGISTRATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Register pharmacy (with file upload)
+// Register pharmacy (with file upload) — after Google sign-in confirms new user
 app.post('/api/pharmacy/register', upload.single('drug_license_photo'), async (req, res) => {
-  const { mobile, pharmacy_name, owner_name, email, address, drug_license_number, drug_license_expiry } = req.body;
+  const { mobile, pharmacy_name, owner_name, email, google_id, address, drug_license_number, drug_license_expiry } = req.body;
 
-  if (!mobile || !pharmacy_name || !owner_name || !drug_license_number) {
+  if (!email || !pharmacy_name || !owner_name || !drug_license_number || !mobile) {
     return res.status(400).json({ error: 'Required fields missing' });
   }
 
   try {
-    // Check if already registered
-    const existing = await pool.query('SELECT id FROM pharmacies WHERE mobile = $1', [mobile]);
-    if (existing.rows.length > 0) return res.status(400).json({ error: 'Mobile already registered' });
+    // Check if already registered by email
+    const existing = await pool.query('SELECT id FROM pharmacies WHERE email = $1', [email]);
+    if (existing.rows.length > 0) return res.status(400).json({ error: 'This Google account is already registered' });
 
     // Upload drug license photo if provided
     let photoUrl = null;
@@ -105,12 +108,30 @@ app.post('/api/pharmacy/register', upload.single('drug_license_photo'), async (r
     }
 
     const result = await pool.query(
-      `INSERT INTO pharmacies (mobile, pharmacy_name, owner_name, email, address, drug_license_number, drug_license_expiry, drug_license_photo_url, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING *`,
-      [mobile, pharmacy_name, owner_name, email || null, address || null, drug_license_number, drug_license_expiry || null, photoUrl]
+      `INSERT INTO pharmacies (mobile, pharmacy_name, owner_name, email, google_id, address, drug_license_number, drug_license_expiry, drug_license_photo_url, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') RETURNING *`,
+      [mobile, pharmacy_name, owner_name, email, google_id || null, address || null, drug_license_number, drug_license_expiry || null, photoUrl]
     );
 
-    res.json({ message: 'Registration submitted. Awaiting approval.', pharmacy_id: result.rows[0].id });
+    const token = jwt.sign(
+      { id: result.rows[0].id, email: result.rows[0].email, status: 'pending', role: 'pharmacy' },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({
+      message: 'Registration submitted. Awaiting approval.',
+      pharmacy_id: result.rows[0].id,
+      token,
+      pharmacy: {
+        id: result.rows[0].id,
+        pharmacy_name: result.rows[0].pharmacy_name,
+        owner_name: result.rows[0].owner_name,
+        mobile: result.rows[0].mobile,
+        email: result.rows[0].email,
+        status: 'pending',
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Registration failed' });
