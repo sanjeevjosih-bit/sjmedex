@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
+import { useAuth } from '../context/AuthContext';
 
-const STEPS = ['Verify Mobile','Your Details','Documents','Done'];
+const STEPS = ['Your Details','Documents','Done'];
 
 const Logo = () => (
   <svg width="32" height="32" viewBox="0 0 38 38" fill="none">
@@ -15,18 +16,28 @@ const Logo = () => (
 export default function Register() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login } = useAuth();
   const params = new URLSearchParams(location.search);
-  const prefill = location.state || {};
+  const googleInfo = location.state || {};
+
+  // If someone lands here without Google info (e.g. typed URL directly), send them to login first
+  if (!googleInfo.email) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f9fafb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>🔒</div>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Please sign in first</div>
+        <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 20 }}>Use Google Sign-In to start your registration.</p>
+        <Link to="/login" style={{ background: '#0a5c47', color: '#fff', padding: '12px 24px', borderRadius: 8, fontWeight: 700, textDecoration: 'none' }}>Go to Login →</Link>
+      </div>
+    );
+  }
 
   const [regType, setRegType] = useState(params.get('type') || 'pharmacy');
-  const [step, setStep] = useState(prefill.verified ? 1 : 0);
+  const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [devOtp, setDevOtp] = useState('');
-  const [mobile, setMobile] = useState(prefill.mobile || '');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [form, setForm] = useState({name:'',owner_name:'',email:'',address:'',registration_number:'',specialization:''});
+  const [mobile, setMobile] = useState('');
+  const [form, setForm] = useState({name:'',owner_name:googleInfo.name||'',address:'',registration_number:'',specialization:''});
   const [license, setLicense] = useState({drug_license_number:'',drug_license_expiry:'',file:null});
 
   function setF(k,v){setForm(f=>({...f,[k]:v}));}
@@ -37,38 +48,19 @@ export default function Register() {
   const accentLight = isPharmacy ? '#e5f5ef' : '#eff6ff';
   const accentBorder = isPharmacy ? '#86efac' : '#93c5fd';
 
-  async function sendOTP() {
-    if(mobile.length!==10) return setError('Enter valid 10-digit mobile number');
-    setLoading(true);setError('');
-    try {
-      const res = await api.post('/auth/send-otp',{mobile});
-      if(res.data.dev_otp) setDevOtp(res.data.dev_otp);
-      setOtpSent(true);
-    } catch(err){setError(err.response?.data?.error||'Failed to send OTP');}
-    finally{setLoading(false);}
-  }
-
-  async function verifyOTP() {
-    if(otp.length!==4) return setError('Enter 4-digit OTP');
-    setLoading(true);setError('');
-    try {
-      await api.post('/auth/verify-otp',{mobile,otp});
-      setStep(1);
-    } catch(err){setError(err.response?.data?.error||'Invalid OTP');}
-    finally{setLoading(false);}
-  }
-
   async function submitRegistration() {
+    if (!mobile || mobile.length !== 10) return setError('Enter a valid 10-digit mobile number');
+    if (!form.name || !form.address) return setError('Name and address are required');
     if(isPharmacy && !license.drug_license_number) return setError('Drug License Number is required');
     if(!isPharmacy && !form.registration_number) return setError('Registration number is required');
     setLoading(true);setError('');
     try {
       const data = new FormData();
       data.append('mobile', mobile);
-      data.append('reg_type', regType);
+      data.append('email', googleInfo.email);
+      data.append('google_id', googleInfo.google_id || '');
       data.append('pharmacy_name', form.name);
       data.append('owner_name', form.owner_name);
-      data.append('email', form.email);
       data.append('address', form.address);
       if(isPharmacy){
         data.append('drug_license_number', license.drug_license_number);
@@ -78,8 +70,13 @@ export default function Register() {
         data.append('specialization', form.specialization);
       }
       if(license.file) data.append('drug_license_photo', license.file);
-      await api.post('/pharmacy/register', data, {headers:{'Content-Type':'multipart/form-data'}});
-      setStep(3);
+      const res = await api.post('/pharmacy/register', data, {headers:{'Content-Type':'multipart/form-data'}});
+
+      // Log the user in immediately with the token returned from registration
+      if (res.data.token) {
+        login(res.data.token, res.data.pharmacy);
+      }
+      setStep(2);
     } catch(err){setError(err.response?.data?.error||'Registration failed');}
     finally{setLoading(false);}
   }
@@ -98,8 +95,18 @@ export default function Register() {
               <div style={{fontSize:9,color:'#6b7280',letterSpacing:'0.5px'}}>WHOLESALE MEDICAL PLATFORM</div>
             </div>
           </Link>
-          <Link to="/login" style={{fontSize:13,color:'#6b7280',textDecoration:'none'}}>Login →</Link>
         </div>
+
+        {/* SIGNED IN AS GOOGLE ACCOUNT BANNER */}
+        {step < 2 && (
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 18 }}>✅</span>
+            <div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Signed in as</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0a1a14' }}>{googleInfo.email}</div>
+            </div>
+          </div>
+        )}
 
         {step===0&&(
           <div style={{background:'#fff',borderRadius:12,padding:14,marginBottom:14,border:'1px solid #e5e7eb'}}>
@@ -131,38 +138,18 @@ export default function Register() {
 
         {step===0&&(
           <div style={{background:'#fff',borderRadius:14,padding:24,border:'1px solid #e5e7eb'}}>
-            <div style={{fontWeight:700,fontSize:17,marginBottom:4}}>Verify your mobile</div>
-            <p style={{color:'#6b7280',fontSize:13,marginBottom:20}}>This will be your login ID for SJ Medex</p>
-            <div style={{marginBottom:16}}>
-              <label style={{fontSize:11,fontWeight:700,color:'#6b7280',display:'block',marginBottom:6}}>MOBILE NUMBER</label>
+            <div style={{fontWeight:700,fontSize:17,marginBottom:4}}>{isPharmacy?'Pharmacy Details':'Doctor / Clinic Details'}</div>
+            <p style={{color:'#6b7280',fontSize:13,marginBottom:20}}>Tell us about your business</p>
+
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:700,color:'#6b7280',display:'block',marginBottom:6}}>MOBILE NUMBER *</label>
               <div style={{display:'flex',gap:8}}>
                 <div style={{padding:'10px 12px',border:'1px solid #e5e7eb',borderRadius:7,fontSize:14,color:'#6b7280',background:'#f9fafb',whiteSpace:'nowrap'}}>+91</div>
                 <input style={{...inp,flex:1}} type="tel" maxLength={10} placeholder="9XXXXXXXXX" value={mobile} onChange={e=>setMobile(e.target.value.replace(/\D/g,''))} />
               </div>
+              <div style={{fontSize:11,color:'#9ca3af',marginTop:5}}>For order updates and support calls</div>
             </div>
-            {otpSent&&(
-              <div style={{marginBottom:16}}>
-                <label style={{fontSize:11,fontWeight:700,color:'#6b7280',display:'block',marginBottom:6}}>ENTER OTP</label>
-                <input style={{...inp,fontSize:22,textAlign:'center',letterSpacing:12,fontWeight:700}} type="number" placeholder="——" value={otp} onChange={e=>setOtp(e.target.value.slice(0,4))} autoFocus />
-                {devOtp&&<div style={{background:'#e5f5ef',borderRadius:6,padding:'7px 12px',fontSize:12,color:'#0a5c47',marginTop:8}}><strong>Dev OTP:</strong> {devOtp}</div>}
-              </div>
-            )}
-            <button onClick={otpSent?verifyOTP:sendOTP} disabled={loading} style={{width:'100%',padding:'12px',background:accentColor,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer'}}>
-              {loading?'Please wait...':(otpSent?'Verify OTP':'Send OTP')}
-            </button>
-            <p style={{textAlign:'center',fontSize:12,color:'#9ca3af',marginTop:14}}>Already registered? <Link to="/login" style={{color:accentColor}}>Login</Link></p>
-          </div>
-        )}
 
-        {step===1&&(
-          <div style={{background:'#fff',borderRadius:14,padding:24,border:'1px solid #e5e7eb'}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20,padding:'12px 14px',background:accentLight,borderRadius:10,border:`1px solid ${accentBorder}`}}>
-              <span style={{fontSize:22}}>{isPharmacy?'🏥':'👨‍⚕️'}</span>
-              <div>
-                <div style={{fontWeight:700,fontSize:14,color:accentColor}}>{isPharmacy?'Pharmacy Registration':'Doctor / Clinic Registration'}</div>
-                <div style={{fontSize:11,color:'#6b7280'}}>+91 {mobile} · Verified ✓</div>
-              </div>
-            </div>
             <div style={{marginBottom:14}}>
               <label style={{fontSize:11,fontWeight:700,color:'#6b7280',display:'block',marginBottom:6}}>{isPharmacy?'PHARMACY / SHOP NAME *':'DOCTOR NAME / CLINIC NAME *'}</label>
               <input style={inp} placeholder={isPharmacy?'e.g. Sharma Medical Store':'e.g. Dr. Priya Nair or Nair Clinic'} value={form.name} onChange={e=>setF('name',e.target.value)} />
@@ -179,20 +166,19 @@ export default function Register() {
                 <input style={inp} placeholder="e.g. General Physician, Pediatrician, Surgeon" value={form.specialization} onChange={e=>setF('specialization',e.target.value)} />
               </div>
             )}
-            <div style={{marginBottom:14}}>
+            <div style={{marginBottom:16}}>
               <label style={{fontSize:11,fontWeight:700,color:'#6b7280',display:'block',marginBottom:6}}>FULL ADDRESS *</label>
               <textarea style={{...inp,resize:'vertical'}} rows={2} placeholder={isPharmacy?'Shop address with city and pincode':'Clinic address with city and pincode'} value={form.address} onChange={e=>setF('address',e.target.value)} />
             </div>
-            <div style={{marginBottom:16}}>
-              <label style={{fontSize:11,fontWeight:700,color:'#6b7280',display:'block',marginBottom:6}}>EMAIL (OPTIONAL)</label>
-              <input style={inp} type="email" placeholder="For order notifications" value={form.email} onChange={e=>setF('email',e.target.value)} />
-            </div>
-            <button onClick={()=>{if(!form.name||!form.address) return setError('Name and address are required');setError('');setStep(2);}} style={{width:'100%',padding:'12px',background:accentColor,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',marginBottom:8}}>Continue →</button>
-            <button onClick={()=>setStep(0)} style={{width:'100%',padding:'10px',background:'transparent',color:'#6b7280',border:'1px solid #e5e7eb',borderRadius:8,fontSize:13,cursor:'pointer'}}>← Back</button>
+            <button onClick={()=>{
+              if(!mobile||mobile.length!==10) return setError('Enter a valid 10-digit mobile number');
+              if(!form.name||!form.address) return setError('Name and address are required');
+              setError('');setStep(1);
+            }} style={{width:'100%',padding:'12px',background:accentColor,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer'}}>Continue →</button>
           </div>
         )}
 
-        {step===2&&(
+        {step===1&&(
           <div style={{background:'#fff',borderRadius:14,padding:24,border:'1px solid #e5e7eb'}}>
             <div style={{fontWeight:700,fontSize:17,marginBottom:4}}>{isPharmacy?'Drug License Details':'Medical Registration'}</div>
             <p style={{color:'#6b7280',fontSize:13,marginBottom:20}}>We verify every {isPharmacy?'Drug License':'registration'} manually before approval.</p>
@@ -235,21 +221,21 @@ export default function Register() {
             <button onClick={submitRegistration} disabled={loading} style={{width:'100%',padding:'12px',background:accentColor,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',marginBottom:8}}>
               {loading?'Submitting...':`Submit ${isPharmacy?'Pharmacy':'Doctor'} Application`}
             </button>
-            <button onClick={()=>setStep(1)} style={{width:'100%',padding:'10px',background:'transparent',color:'#6b7280',border:'1px solid #e5e7eb',borderRadius:8,fontSize:13,cursor:'pointer'}}>← Back</button>
+            <button onClick={()=>setStep(0)} style={{width:'100%',padding:'10px',background:'transparent',color:'#6b7280',border:'1px solid #e5e7eb',borderRadius:8,fontSize:13,cursor:'pointer'}}>← Back</button>
           </div>
         )}
 
-        {step===3&&(
+        {step===2&&(
           <div style={{background:'#fff',borderRadius:14,padding:32,border:'1px solid #e5e7eb',textAlign:'center'}}>
             <div style={{width:72,height:72,background:'#f0fdf4',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px',fontSize:32}}>✅</div>
             <div style={{fontWeight:800,fontSize:20,marginBottom:8,color:'#0a3d2e'}}>Application Submitted!</div>
-            <p style={{color:'#6b7280',fontSize:14,lineHeight:1.7,marginBottom:20}}>Your {isPharmacy?'Drug License':'registration'} is under review. Our team will verify within <strong>24 hours</strong> and activate your account. SMS will be sent to <strong>+91 {mobile}</strong>.</p>
+            <p style={{color:'#6b7280',fontSize:14,lineHeight:1.7,marginBottom:20}}>Your {isPharmacy?'Drug License':'registration'} is under review. Our team will verify within <strong>24 hours</strong> and activate your account.</p>
             <div style={{background:'#f9fafb',borderRadius:10,padding:16,textAlign:'left',fontSize:13,marginBottom:16,border:'1px solid #e5e7eb'}}>
               <div style={{display:'flex',justifyContent:'space-between',paddingBottom:8,borderBottom:'1px solid #e5e7eb',marginBottom:8}}>
                 <span style={{color:'#6b7280'}}>{isPharmacy?'Pharmacy':'Clinic/Doctor'}</span><strong>{form.name}</strong>
               </div>
               <div style={{display:'flex',justifyContent:'space-between',paddingBottom:8,borderBottom:'1px solid #e5e7eb',marginBottom:8}}>
-                <span style={{color:'#6b7280'}}>Mobile</span><span>+91 {mobile}</span>
+                <span style={{color:'#6b7280'}}>Email</span><span>{googleInfo.email}</span>
               </div>
               <div style={{display:'flex',justifyContent:'space-between'}}>
                 <span style={{color:'#6b7280'}}>Type</span><span style={{fontWeight:600,color:accentColor}}>{isPharmacy?'Pharmacy':'Doctor/Clinic'}</span>
@@ -258,7 +244,7 @@ export default function Register() {
             <div style={{background:'#e5f5ef',borderRadius:10,padding:'12px 14px',fontSize:12,color:'#0a5c47',marginBottom:20,display:'flex',gap:8,alignItems:'flex-start',textAlign:'left'}}>
               <span>💡</span><span>Need faster approval? Call <strong>+91 8595501653</strong> with your details.</span>
             </div>
-            <button onClick={()=>navigate('/login')} style={{width:'100%',padding:'12px',background:accentColor,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer'}}>Go to Login →</button>
+            <button onClick={()=>navigate('/pending')} style={{width:'100%',padding:'12px',background:accentColor,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer'}}>Continue →</button>
           </div>
         )}
       </div>
