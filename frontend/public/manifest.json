@@ -1,12 +1,12 @@
 {
-  "name": "SJ Medex",
+  "name": "SJ Medex - Wholesale Medical Platform",
   "short_name": "SJ Medex",
-  "description": "Wholesale medicines & surgical supplies for pharmacies",
+  "description": "Wholesale medical supplies for licensed pharmacies and doctors",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0F6E56",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/icon-192.png",
