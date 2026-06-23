@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /products
+Disallow: /orders
+Disallow: /cart
+Disallow: /profile
+Disallow: /pending
+
+Sitemap: https://sjmedex.in/sitemap.xml
