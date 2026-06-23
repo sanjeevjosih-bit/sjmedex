@@ -11,7 +11,7 @@ const { authMiddleware, adminMiddleware } = require('./middleware');
 const { syncSwipeProductsToDatabase } = require('./swipeSync');
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
@@ -420,6 +420,18 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
   });
 }
+
+// ─── Error handler for file upload issues (e.g. file too large) ─────────────
+app.use((err, req, res, next) => {
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'File is too large. Please upload an image or PDF under 10MB.' });
+  }
+  if (err) {
+    console.error('Unhandled error:', err);
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+  next();
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`SJ Medex server running on port ${PORT}`));
