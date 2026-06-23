@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import InstallButton from '../components/InstallButton';
 
 const Logo = () => (
   <svg width="32" height="32" viewBox="0 0 38 38" fill="none">
@@ -90,6 +91,7 @@ export default function Home() {
             </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <InstallButton/>
             <Link to="/login" className="hide-mob" style={{fontSize:13,color:'#0a5c47',fontWeight:600,padding:'6px 14px',borderRadius:7,border:'1px solid #d1fae5',background:'#f0fdf9'}}>Login</Link>
             <Link to="/register" style={{background:'#0a5c47',color:'#fff',padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:700,whiteSpace:'nowrap'}}>Register Free</Link>
             <Link to="/admin/login" className="hide-mob" style={{fontSize:11,color:'#d1d5db'}}>Admin</Link>
