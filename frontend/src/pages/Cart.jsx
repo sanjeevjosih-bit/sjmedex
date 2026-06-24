@@ -8,10 +8,20 @@ export default function Cart() {
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('sjmedex_cart')||'{}'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cod');
   const navigate = useNavigate();
 
   useEffect(() => { api.get('/products').then(r=>setProducts(r.data)).catch(()=>{}); }, []);
   useEffect(() => { localStorage.setItem('sjmedex_cart', JSON.stringify(cart)); }, [cart]);
+
+  // Load Cashfree's checkout SDK once
+  useEffect(() => {
+    if (window.Cashfree) return;
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
 
   const cartItems = Object.entries(cart).map(([id,qty])=>({...products.find(p=>p.id==id),qty})).filter(p=>p.id);
   const total = cartItems.reduce((s,p)=>s+parseFloat(p.price)*p.qty,0);
@@ -30,7 +40,21 @@ export default function Cart() {
     setLoading(true); setError('');
     try {
       const items = cartItems.map(p=>({product_id:p.id, qty:p.qty}));
-      await api.post('/orders', {items});
+      const res = await api.post('/orders', { items, payment_method: paymentMethod });
+
+      if (paymentMethod === 'online' && res.data.payment_session_id) {
+        // Redirect to Cashfree's hosted checkout
+        const cashfree = window.Cashfree({ mode: 'production' });
+        localStorage.removeItem('sjmedex_cart');
+        setCart({});
+        cashfree.checkout({
+          paymentSessionId: res.data.payment_session_id,
+          redirectTarget: '_self',
+        });
+        return;
+      }
+
+      // COD or fallback — order placed directly
       localStorage.removeItem('sjmedex_cart');
       setCart({});
       navigate('/orders');
@@ -53,7 +77,7 @@ export default function Cart() {
             <button onClick={()=>navigate('/products')} style={{padding:'10px 24px',background:'#0F6E56',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>Browse Products</button>
           </div>
         ) : (
-          <div style={{display:'grid',gridTemplateColumns:'1fr 300px',gap:20}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:20}}>
             <div>
               {cartItems.map(p=>{
                 const minOrder = parseInt(p.min_order)||1000;
@@ -101,10 +125,34 @@ export default function Cart() {
                 </div>
                 <div style={{textAlign:'center',marginTop:8,fontSize:11,color:'#15803d',fontWeight:500}}>🚚 FREE Delivery on all orders</div>
               </div>
+
+              {/* PAYMENT METHOD CHOICE */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#6b7280',letterSpacing:'0.5px',marginBottom:8}}>PAYMENT METHOD</div>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <label style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',border:`1.5px solid ${paymentMethod==='cod'?'#0F6E56':'#e5e7eb'}`,borderRadius:9,cursor:'pointer',background:paymentMethod==='cod'?'#f0fdf9':'#fff'}}>
+                    <input type="radio" name="payment" checked={paymentMethod==='cod'} onChange={()=>setPaymentMethod('cod')} style={{accentColor:'#0F6E56'}} />
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#16201C'}}>Cash on Delivery</div>
+                      <div style={{fontSize:11,color:'#9ca3af'}}>Pay when your order arrives</div>
+                    </div>
+                  </label>
+                  <label style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',border:`1.5px solid ${paymentMethod==='online'?'#0F6E56':'#e5e7eb'}`,borderRadius:9,cursor:'pointer',background:paymentMethod==='online'?'#f0fdf9':'#fff'}}>
+                    <input type="radio" name="payment" checked={paymentMethod==='online'} onChange={()=>setPaymentMethod('online')} style={{accentColor:'#0F6E56'}} />
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#16201C'}}>Pay Online Now</div>
+                      <div style={{fontSize:11,color:'#9ca3af'}}>UPI, Cards, Net Banking</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <button onClick={placeOrder} disabled={loading} style={{width:'100%',padding:13,background:'#0F6E56',color:'#fff',border:'none',borderRadius:8,fontSize:15,fontWeight:600,cursor:'pointer'}}>
-                {loading?'Placing order...':'Place Order ✓'}
+                {loading?'Placing order...':(paymentMethod==='online'?'Proceed to Pay →':'Place Order ✓')}
               </button>
-              <p style={{fontSize:11,color:'#9ca3af',textAlign:'center',marginTop:10}}>Payment on delivery · No hidden charges</p>
+              <p style={{fontSize:11,color:'#9ca3af',textAlign:'center',marginTop:10}}>
+                {paymentMethod==='online' ? 'Secure checkout powered by Cashfree' : 'No hidden charges'}
+              </p>
             </div>
           </div>
         )}
