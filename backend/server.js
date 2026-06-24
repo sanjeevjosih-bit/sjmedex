@@ -211,7 +211,7 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     });
 
     const subtotal = orderItems.reduce((s, i) => s + i.total, 0);
-    const deliveryCharge = subtotal >= 5000 ? 0 : 199;
+    const deliveryCharge = 0;
     const total = subtotal + deliveryCharge;
     const orderNumber = generateOrderNumber();
     const method = payment_method === 'online' ? 'online' : 'cod';
