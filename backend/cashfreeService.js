@@ -25,6 +25,7 @@ async function createCashfreeOrder({ orderId, amount, customerName, customerPhon
     },
     order_meta: {
       return_url: returnUrl,
+      notify_url: 'https://sjmedex.in/api/payments/webhook',
     },
   };
 
