@@ -399,6 +399,58 @@ app.patch('/api/admin/orders/:id/status', adminMiddleware, async (req, res) => {
   }
 });
 
+// Admin: edit order items/quantities/prices after placement, recalculates total
+app.patch('/api/admin/orders/:id/items', adminMiddleware, async (req, res) => {
+  const { items, delivery_charge } = req.body; // items: [{product_id, name, qty, price}]
+  if (!items || items.length === 0) return res.status(400).json({ error: 'Order must have at least one item' });
+
+  try {
+    const enrichedItems = items.map(i => ({
+      product_id: i.product_id,
+      name: i.name,
+      qty: parseFloat(i.qty),
+      price: parseFloat(i.price),
+      total: parseFloat(i.qty) * parseFloat(i.price),
+    }));
+    const subtotal = enrichedItems.reduce((s, i) => s + i.total, 0);
+    const dc = delivery_charge !== undefined ? parseFloat(delivery_charge) : 0;
+    const total = subtotal + dc;
+
+    const result = await pool.query(
+      `UPDATE orders SET items = $1, subtotal = $2, delivery_charge = $3, total = $4, updated_at = NOW() WHERE id = $5 RETURNING *`,
+      [JSON.stringify(enrichedItems), subtotal, dc, total, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Admin: directly onboard a pre-verified pharmacy (skips registration flow, auto-approved)
+app.post('/api/admin/pharmacies', adminMiddleware, async (req, res) => {
+  const { pharmacy_name, owner_name, mobile, email, address, drug_license_number, drug_license_expiry } = req.body;
+  if (!pharmacy_name || !mobile || !drug_license_number) {
+    return res.status(400).json({ error: 'Pharmacy name, mobile and drug license number are required' });
+  }
+
+  try {
+    const existing = await pool.query('SELECT id FROM pharmacies WHERE mobile = $1 OR (email = $2 AND email IS NOT NULL)', [mobile, email || null]);
+    if (existing.rows.length > 0) return res.status(400).json({ error: 'A pharmacy with this mobile or email already exists' });
+
+    const result = await pool.query(
+      `INSERT INTO pharmacies (pharmacy_name, owner_name, mobile, email, address, drug_license_number, drug_license_expiry, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'approved') RETURNING *`,
+      [pharmacy_name, owner_name || pharmacy_name, mobile, email || null, address || null, drug_license_number, drug_license_expiry || null]
+    );
+    res.json({ message: 'Pharmacy onboarded and approved', pharmacy: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to onboard pharmacy' });
+  }
+});
+
 // Admin: products CRUD
 app.get('/api/admin/products', adminMiddleware, async (req, res) => {
   const result = await pool.query('SELECT * FROM products ORDER BY category, name');
