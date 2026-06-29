@@ -10,6 +10,7 @@ import Orders from './pages/Orders';
 import Profile from './pages/Profile';
 import Pending from './pages/Pending';
 import PaymentStatus from './pages/PaymentStatus';
+import CategoryPage, { CATEGORIES } from './pages/Categories';
 import AdminLogin from './pages/AdminLogin';
 import AdminApp from './pages/AdminApp';
 function ProtectedRoute({ children }) {
@@ -43,6 +44,9 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/*" element={<AdminRoute><AdminApp /></AdminRoute>} />
+          {CATEGORIES.map(c => (
+            <Route key={c.slug} path={`/${c.slug}`} element={<CategoryPage slug={c.slug} />} />
+          ))}
         </Routes>
       </BrowserRouter>
     </AuthProvider>
