@@ -180,6 +180,32 @@ export default function Home() {
         </div>
       </div>
 
+      {/* WHAT WE SUPPLY — internal links for SEO discovery, moved to top */}
+      <div className="sp" style={{padding:'40px 20px',background:'#F9FFFE',borderBottom:'1px solid #e5f5ef'}}>
+        <div style={{maxWidth:1100,margin:'0 auto'}}>
+          <div style={{fontSize:11,fontWeight:700,color:'#1DB97A',letterSpacing:'2px',marginBottom:8}}>WHAT WE SUPPLY</div>
+          <h2 style={{fontSize:22,fontWeight:800,color:'#0a1a14',marginBottom:18}}>Wholesale rates on every category</h2>
+          <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+            {[
+              ['bp-machine-wholesaler-faridabad','🩺 BP Machines'],
+              ['adult-diaper-wholesaler-faridabad','📦 Adult Diapers'],
+              ['iv-fluid-wholesaler-haryana','💧 IV Fluids'],
+              ['iv-set-wholesaler-faridabad','🔗 IV Sets'],
+              ['nebulizer-wholesaler-faridabad','💨 Nebulizers'],
+              ['cannula-fixer-wholesaler','🩹 Cannula Fixers'],
+              ['surgical-bandage-wholesaler-manufacturer','🧻 Surgical Bandages'],
+              ['syringe-wholesaler-faridabad','💉 Syringes'],
+              ['medicine-envelope-wholesaler','✉️ Medicine Envelopes'],
+              ['medical-equipment-wholesaler-faridabad','🏥 All Medical Equipment'],
+            ].map(([slug,label])=>(
+              <Link key={slug} to={`/${slug}`} style={{fontSize:13,color:'#0a5c47',background:'#fff',padding:'9px 16px',borderRadius:20,border:'1px solid #d1fae5',fontWeight:600}}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* WHY JOIN */}
       <div className="sp" style={{background:'#fff'}}>
         <div style={{maxWidth:1100,margin:'0 auto'}}>
@@ -294,32 +320,6 @@ export default function Home() {
             </Link>
           </div>
           <a href="tel:+918595501653" style={{color:'#6ee7b7',fontSize:13,fontWeight:500}}>📞 Call: +91 85955 01653</a>
-        </div>
-      </div>
-
-      {/* WHAT WE SUPPLY — internal links for SEO discovery */}
-      <div className="sp" style={{padding:'48px 20px',background:'#fff'}}>
-        <div style={{maxWidth:1100,margin:'0 auto'}}>
-          <div style={{fontSize:11,fontWeight:700,color:'#1DB97A',letterSpacing:'2px',marginBottom:8}}>WHAT WE SUPPLY</div>
-          <h2 style={{fontSize:22,fontWeight:800,color:'#0a1a14',marginBottom:18}}>Wholesale rates on every category</h2>
-          <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-            {[
-              ['bp-machine-wholesaler-faridabad','🩺 BP Machines'],
-              ['adult-diaper-wholesaler-faridabad','📦 Adult Diapers'],
-              ['iv-fluid-wholesaler-haryana','💧 IV Fluids'],
-              ['iv-set-wholesaler-faridabad','🔗 IV Sets'],
-              ['nebulizer-wholesaler-faridabad','💨 Nebulizers'],
-              ['cannula-fixer-wholesaler','🩹 Cannula Fixers'],
-              ['surgical-bandage-wholesaler-manufacturer','🧻 Surgical Bandages'],
-              ['syringe-wholesaler-faridabad','💉 Syringes'],
-              ['medicine-envelope-wholesaler','✉️ Medicine Envelopes'],
-              ['medical-equipment-wholesaler-faridabad','🏥 All Medical Equipment'],
-            ].map(([slug,label])=>(
-              <Link key={slug} to={`/${slug}`} style={{fontSize:13,color:'#0a5c47',background:'#f0fdf9',padding:'9px 16px',borderRadius:20,border:'1px solid #d1fae5',fontWeight:600}}>
-                {label}
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
 
